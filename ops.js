@@ -457,7 +457,7 @@
       var readM = function () {
         var rows = [0, 1, 2].map(function (i) {
           var r = {};
-          document.querySelectorAll('#s' + n + 'Form [data-r="' + i + '"]').forEach(function (inp) { r[inp.dataset.k] = inp.type === "number" ? (parseFloat(inp.value) || 0) : inp.value.trim(); });
+          document.querySelectorAll('#s' + n + 'Form [data-r="' + i + '"]').forEach(function (inp) { r[inp.dataset.k] = (inp.type === "number" || inp.dataset.num) ? (parseFloat(inp.value) || 0) : inp.value.trim(); });
           return r;
         });
         return { spend: $("s" + n + "spend").value, impr: $("s" + n + "impr").value, clicks: $("s" + n + "clicks").value, leads: $("s" + n + "leads").value,

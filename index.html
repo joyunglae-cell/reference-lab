@@ -839,6 +839,11 @@
       <h2>설정</h2>
       <p>화면 테마, AI 분석 엔진, 수익 기준, 자주 쓰는 사이트 연결, 데이터 백업을 관리합니다. 모든 값은 이 브라우저에만 저장됩니다.</p>
     </header>
+    <div class="savebar" id="saveBar">
+      <span class="pill good" id="savePill">저장됨</span>
+      <span class="note" id="saveNote">입력하면 자동으로 저장되며, 저장 버튼으로 한 번에 확정할 수 있습니다.</span>
+      <button class="btn blue" type="button" id="saveBtn">설정 저장</button>
+    </div>
     <div class="grid2">
       <div class="panel stack">
         <h3 class="sub">화면</h3>
@@ -884,22 +889,23 @@
             </select>
           </label>
           <label class="f">Gemini 모델
-            <input type="text" id="sGeminiModel" list="geminiModels" placeholder="gemini-2.5-flash">
+            <input type="text" id="sGeminiModel" list="geminiModels" placeholder="gemini-3.5-flash">
             <datalist id="geminiModels">
-              <option value="gemini-2.5-flash"></option>
-              <option value="gemini-2.5-pro"></option>
-              <option value="gemini-3-pro-preview"></option>
+              <option value="gemini-3.5-flash">Gemini 3.5 Flash (기본)</option>
+              <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite (저렴)</option>
+              <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro (고품질)</option>
             </datalist>
           </label>
           <label class="f full">Gemini API 키<input type="password" id="sGeminiKey" autocomplete="off" placeholder="AIza..."></label>
           <label class="f">이미지 생성 모델 (나노바나나)
-            <input type="text" id="sImgModel" list="imgModels" placeholder="gemini-2.5-flash-image">
+            <input type="text" id="sImgModel" list="imgModels" placeholder="gemini-3.1-flash-image">
             <datalist id="imgModels">
-              <option value="gemini-2.5-flash-image"></option>
-              <option value="gemini-3-pro-image-preview"></option>
-              <option value="gemini-3.1-flash-image-preview"></option>
+              <option value="gemini-3.1-flash-image">나노바나나 2 (기본)</option>
+              <option value="gemini-3-pro-image">나노바나나 Pro (고품질)</option>
+              <option value="gemini-3.1-flash-lite-image">나노바나나 2 Lite (저렴)</option>
             </datalist>
           </label>
+          <div class="row full"><button class="btn ghost sm" type="button" id="gemLatest">최신 모델 자동 불러오기</button><span class="note" id="gemLatestMsg">Gemini 키를 넣고 누르면 내 키로 쓸 수 있는 가장 새 모델로 바꿉니다. 모델이 종료되면 사용할 때 자동으로 바뀝니다.</span></div>
           <label class="f">YouTube Data API 키 (레퍼런스 조회수 순 검색)<input type="password" id="sYtKey" autocomplete="off" placeholder="AIza..."></label>
           <p class="note full">광고 이미지 생성은 AI 엔진 선택과 관계없이 <b>Gemini API 키</b>로 동작합니다. YouTube 키는 Google Cloud 콘솔에서 YouTube Data API v3를 켜고 만든 키를 넣으세요(무료 할당량 하루 10,000단위, 검색 1회 약 100단위).</p>
           <label class="toggle full"><input type="checkbox" id="sWeb"> AI가 웹 검색과 링크 열람을 사용 (최근 흐름·랜딩 내용 반영)</label>
@@ -950,7 +956,7 @@
       <h3 class="sub">사이트 연결</h3>
       <div class="conn" id="conn"></div>
       <h3 class="sub">내 네트워크 대시보드 주소</h3>
-      <p class="note">가입한 네트워크의 로그인 후 주소를 넣어 두면 사이드 메뉴 아래와 여기에서 바로 열 수 있습니다.</p>
+      <p class="note">가입한 네트워크의 로그인 후 주소를 넣으면 <b>바로 확인</b>합니다: 주소 형식, 그 네트워크의 도메인인지, 접속되는지. 확인된 주소는 자동 저장되고 1단계 '네트워크 열기'와 사이드 메뉴에서 바로 열립니다.</p>
       <div class="inputs three" id="netUrls"></div>
     </div>
 
@@ -995,6 +1001,7 @@
 
 <script src="data.js"></script>
 <script src="store.js"></script>
+<script src="numfmt.js"></script>
 <script src="ai.js"></script>
 <script src="app.js"></script>
 <script src="dash.js"></script>

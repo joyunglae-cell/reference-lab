@@ -101,11 +101,60 @@ window.LabAI = (function () {
     return shown;
   }
 
+  /* ───── Gemini 최신 모델 자동 찾기 ─────
+     내 API 키로 쓸 수 있는 모델 목록(ListModels)을 받아 가장 새 버전을 고릅니다.
+     모델 이름이 바뀌거나 예전 모델이 종료돼도(404) 자동으로 최신 모델로 바꿔 다시 시도합니다. */
+  var GEM_TEXT = "gemini-3.5-flash", GEM_IMG = "gemini-3.1-flash-image";
+  function verOf(id) { var m = String(id).match(/gemini-(\d+)(?:\.(\d+))?/); return m ? +m[1] + (m[2] ? +m[2] / Math.pow(10, m[2].length) : 0) : 0; }
+  async function listModels(key) {
+    var out = [], token = "";
+    for (var i = 0; i < 5; i++) {
+      var res = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200" + (token ? "&pageToken=" + encodeURIComponent(token) : ""), { headers: { "x-goog-api-key": key } });
+      var j = await res.json().catch(function () { return {}; });
+      if (!res.ok) throw new Error((j.error && j.error.message) || ("HTTP " + res.status));
+      (j.models || []).forEach(function (m) {
+        if ((m.supportedGenerationMethods || []).indexOf("generateContent") < 0) return;
+        out.push({ id: String(m.name || "").replace(/^models\//, ""), label: m.displayName || "" });
+      });
+      token = j.nextPageToken; if (!token) break;
+    }
+    return out;
+  }
+  function pickBest(list, kind) {
+    var ids = list.map(function (m) { return m.id; }).filter(function (id) {
+      if (!/^gemini-/.test(id)) return false;
+      var img = /image/.test(id);
+      if (kind === "image") return img;
+      return !img && /flash/.test(id) && !/(lite|tts|live|audio|transcribe|embedding|thinking|robotics|computer)/.test(id);
+    });
+    var rank = function (id) {
+      return verOf(id) * 100 - (/preview|exp/.test(id) ? 5 : 0) - (/lite/.test(id) ? 3 : 0) - (/-\d{2}-\d{2}|-\d{3,}$/.test(id) ? 1 : 0) + (kind === "image" && /flash/.test(id) ? 1 : 0);
+    };
+    ids.sort(function (a, b) { return rank(b) - rank(a); });
+    return ids[0] || "";
+  }
+  async function latestModels(key) {
+    var list = await listModels(key);
+    return { list: list, text: pickBest(list, "text"), image: pickBest(list, "image") };
+  }
+  /* 모델을 못 찾으면(404) 최신 모델로 바꿔 저장 */
+  async function healModel(s, kind) {
+    var best = await latestModels(s.geminiKey).catch(function () { return null; });
+    var id = best && best[kind === "image" ? "image" : "text"];
+    if (!id) return "";
+    if (kind === "image") s.imgModel = id; else s.geminiModel = id;
+    try {
+      var st = window.LabStore && window.LabStore.get("settings", null);
+      if (st) { st = Object.assign({}, st); if (kind === "image") st.imgModel = id; else st.geminiModel = id; window.LabStore.set("settings", st); }
+    } catch (e) {}
+    return id;
+  }
+
   /* ───── Gemini API (REST) ───── */
   async function runGemini(o) {
     var s = o.settings;
     if (!s.geminiKey) throw new Error("설정에서 Gemini API 키를 입력하세요.");
-    var model = s.geminiModel || "gemini-2.5-flash";
+    var model = s.geminiModel || GEM_TEXT;
     var parts = [];
     (o.urls || []).forEach(function (u) { if (isYouTube(u)) parts.push({ file_data: { file_uri: u } }); });
     for (var i = 0; i < o.images.length; i++) {
@@ -137,6 +186,8 @@ window.LabAI = (function () {
     var r;
     try {
       r = await call(body);
+      // 모델이 종료·이름 변경됐으면 최신 모델로 바꿔 한 번 더
+      if (!r.ok && r.status === 404) { var nm = await healModel(s, "text"); if (nm && nm !== model) { model = nm; r = await call(body); } }
       // 도구 조합을 지원하지 않는 모델이면 도구 없이 한 번 더
       if (!r.ok && r.status === 400 && body.tools) { delete body.tools; r = await call(body); }
     } catch (e) {
@@ -216,7 +267,7 @@ window.LabAI = (function () {
     if (!s.geminiKey) throw new Error("설정에서 Gemini API 키를 입력하세요. (이미지 생성은 Gemini 키로 동작합니다)");
     var lim = +s.aiLimit || 0, u = usage();
     if (lim > 0 && u.calls >= lim) throw new Error("이번 달 AI 호출 한도(" + lim + "회)에 도달했습니다. 설정에서 한도를 늘릴 수 있습니다.");
-    var model = s.imgModel || "gemini-2.5-flash-image", parts = [];
+    var model = s.imgModel || GEM_IMG, parts = [];
     var refs = o.refs || [];
     for (var i = 0; i < refs.length && i < 3; i++) parts.push({ inline_data: { mime_type: refs[i].type || "image/png", data: await fileToBase64(refs[i]) } });
     parts.push({ text: o.prompt });
@@ -231,6 +282,7 @@ window.LabAI = (function () {
     var r;
     try {
       r = await call(body);
+      if (!r.ok && r.status === 404) { var nm = await healModel(s, "image"); if (nm && nm !== model) { model = nm; r = await call(body); } }
       // 비율 지정을 모르는 모델이면 비율 없이 한 번 더
       if (!r.ok && r.status === 400 && body.generationConfig.imageConfig) { delete body.generationConfig.imageConfig; r = await call(body); }
     } catch (e) {
@@ -239,7 +291,7 @@ window.LabAI = (function () {
     }
     if (!r.ok) {
       var m = (r.json.error && r.json.error.message) || ("HTTP " + r.status);
-      if (r.status === 404) m = "이미지 모델 '" + model + "'을 찾지 못했습니다. 설정에서 이미지 생성 모델 이름을 확인하세요.";
+      if (r.status === 404) m = "이미지 모델 '" + model + "'을 찾지 못했습니다. 설정에서 '최신 모델 자동 불러오기'를 눌러 주세요.";
       throw new Error("이미지 생성 오류: " + m);
     }
     var out = [], note = "";
@@ -300,5 +352,5 @@ window.LabAI = (function () {
     return out.join("");
   }
 
-  return { run: run, image: image, builtin: builtin, md: md, isYouTube: isYouTube, usage: usage };
+  return { run: run, image: image, builtin: builtin, md: md, isYouTube: isYouTube, usage: usage, latestModels: latestModels, pickBest: pickBest, GEM_TEXT: GEM_TEXT, GEM_IMG: GEM_IMG };
 })();

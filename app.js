@@ -65,13 +65,62 @@
   /* ───────── 설정 ───────── */
   var DEFAULTS = {
     theme: "system", provider: "local", chosen: false,
-    claudeKey: "", claudeModel: "claude-opus-5", geminiKey: "", geminiModel: "gemini-2.5-flash",
+    claudeKey: "", claudeModel: "claude-opus-5", geminiKey: "", geminiModel: "gemini-3.5-flash",
     web: true, marginMin: 30, marginMax: 40, vat: true, wht: true, netUrls: {}, goalProfit: 3000000, ghToken: "", gistId: "",
     taxMode: "person", aiLimit: 0, tgToken: "", tgChat: "", tgAuto: false, tgLast: "",
-    imgModel: "gemini-2.5-flash-image", ytKey: ""
+    imgModel: "gemini-3.1-flash-image", ytKey: ""
   };
   var S = Object.assign({}, DEFAULTS, store.get("settings", {}));
-  function saveSettings() { store.set("settings", S); emit("settings"); }
+  // 예전 기본 모델을 쓰던 설정은 최신 기본값으로 올림 (직접 고른 다른 모델은 그대로)
+  function upgradeModels(x) {
+    if (!x.geminiModel || /^gemini-2\.[05]-flash$/.test(x.geminiModel)) x.geminiModel = DEFAULTS.geminiModel;
+    if (!x.imgModel || x.imgModel === "gemini-2.5-flash-image") x.imgModel = DEFAULTS.imgModel;
+    return x;
+  }
+  upgradeModels(S);
+  function saveSettings() { store.set("settings", S); emit("settings"); markSaved(); }
+  function markSaved() {
+    var p = $("savePill"), n = $("saveNote"); if (!p) return;
+    var d = new Date(); p.className = "pill good"; p.textContent = "저장됨";
+    n.textContent = "마지막 저장 " + d.getHours() + ":" + (d.getMinutes() < 10 ? "0" : "") + d.getMinutes() + " · " + (store.backend() === "gist" ? "GitHub에도 자동 동기화" : "이 브라우저에 저장");
+  }
+  function markDirty() { var p = $("savePill"); if (!p) return; p.className = "pill warn"; p.textContent = "입력 중"; $("saveNote").textContent = "입력을 마치면 자동 저장됩니다. 지금 확정하려면 저장 버튼을 누르세요."; }
+
+  /* 내 네트워크 대시보드 주소 자동 확인: 형식 → 도메인 → 접속 */
+  function setNuState(id, cls, text) { var c = $("nuc_" + id); if (c) { c.className = "nuchk " + cls; c.textContent = text; } }
+  function hostOf(u) { try { return new URL(u).hostname.toLowerCase(); } catch (e) { return ""; } }
+  function netOfHost(h) {
+    var hit = "";
+    Object.keys(D.networkDomains || {}).some(function (k) { if (D.networkDomains[k].some(function (w) { return h.indexOf(w) >= 0; })) { hit = k; return true; } return false; });
+    return hit;
+  }
+  function checkNetUrl(id, silent) {
+    var inp = $("nu_" + id); if (!inp) return;
+    var v = inp.value.trim(), open = $("nuo_" + id);
+    if (!v) {
+      setNuState(id, "", ""); if (open) open.hidden = true;
+      if (S.netUrls[id]) { S.netUrls = Object.assign({}, S.netUrls); delete S.netUrls[id]; saveSettings(); renderAiState(); }
+      return;
+    }
+    if (!/^[a-z]+:\/\//i.test(v)) { v = "https://" + v.replace(/^\/+/, ""); inp.value = v; }
+    if (/^http:\/\//i.test(v)) { v = v.replace(/^http:/i, "https:"); inp.value = v; }
+    var h = hostOf(v);
+    if (!/^https:\/\//i.test(v) || !h || h.indexOf(".") < 0) { setNuState(id, "bad", "✕ 주소 형식이 올바르지 않습니다 (예: https://www.사이트.com/대시보드)"); if (open) open.hidden = true; return; }
+    var who = netOfHost(h), name = netName[id] || id;
+    var domMsg = who === id ? "✓ " + name + " 도메인 확인" : who ? "⚠ " + (netName[who] || who) + " 주소로 보입니다. " + name + " 칸이 맞는지 확인하세요" : "⚠ " + name + "의 알려진 도메인이 아닙니다(" + h + "). 주소가 맞으면 그대로 써도 됩니다";
+    var domCls = who === id ? "good" : "warn";
+    S.netUrls = Object.assign({}, S.netUrls); S.netUrls[id] = v; saveSettings(); renderAiState();
+    if (open) { open.href = v; open.hidden = false; }
+    setNuState(id, domCls, domMsg + " · 접속 확인 중…");
+    var ctl = window.AbortController ? new AbortController() : null, to = setTimeout(function () { if (ctl) ctl.abort(); }, 7000);
+    fetch(v, { mode: "no-cors", cache: "no-store", redirect: "follow", signal: ctl ? ctl.signal : undefined })
+      .then(function () { setNuState(id, domCls, domMsg + " · ✓ 접속됨 · 저장했습니다"); if (!silent) toast(name + " 주소를 확인하고 저장했습니다"); })
+      .catch(function () {
+        var blocked = location.protocol !== "https:" && location.protocol !== "http:" && location.protocol !== "file:";
+        setNuState(id, domCls === "good" ? "warn" : domCls, domMsg + (blocked ? " · 이 화면에서는 접속 확인을 할 수 없습니다 · 저장했습니다" : " · 접속하지 못했습니다(주소 오타·사이트 점검·인터넷 확인) · 저장은 했습니다"));
+      })
+      .then(function () { clearTimeout(to); });
+  }
 
   var listeners = {};
   function on(ev, fn) { (listeners[ev] = listeners[ev] || []).push(fn); }
@@ -529,7 +578,7 @@
     $("log").addEventListener("change", function (e) {
       var t = e.target; if (t.dataset.i == null) return;
       var r = log[+t.dataset.i]; if (!r) return;
-      r[t.dataset.k] = t.type === "number" ? Math.max(0, parseFloat(t.value) || 0) : t.value;
+      r[t.dataset.k] = t.type === "number" || t.dataset.num ? Math.max(0, parseFloat(t.value) || 0) : t.value;
       store.set("log", log); renderLog();
     });
     $("log").addEventListener("click", function (e) {
@@ -710,20 +759,58 @@
         .then(function () { btn.disabled = false; });
     });
 
+    // 최신 Gemini 모델 자동 불러오기
+    $("gemLatest").addEventListener("click", function () {
+      var btn = $("gemLatest"), msg = $("gemLatestMsg");
+      S.geminiKey = $("sGeminiKey").value.trim();
+      if (!S.geminiKey) { msg.textContent = "먼저 Gemini API 키를 넣으세요."; return; }
+      btn.disabled = true; msg.textContent = "내 키로 쓸 수 있는 모델을 확인하는 중…";
+      window.LabAI.latestModels(S.geminiKey).then(function (r) {
+        var fill = function (id, kind) {
+          var dl = $(id), have = {}; dl.querySelectorAll("option").forEach(function (o) { have[o.value] = 1; });
+          r.list.filter(function (m) { var img = /image/.test(m.id); return /^gemini-/.test(m.id) && (kind === "image" ? img : !img); })
+            .forEach(function (m) { if (!have[m.id]) { var o = document.createElement("option"); o.value = m.id; o.textContent = m.label; dl.appendChild(o); } });
+        };
+        fill("geminiModels", "text"); fill("imgModels", "image");
+        if (r.text) { S.geminiModel = r.text; $("sGeminiModel").value = r.text; }
+        if (r.image) { S.imgModel = r.image; $("sImgModel").value = r.image; }
+        saveSettings(); renderAiState();
+        msg.textContent = r.text || r.image ? "적용했습니다 · 분석 " + (r.text || "변경 없음") + " · 이미지 " + (r.image || "이미지 모델 없음") + " (목록 " + r.list.length + "개)" : "쓸 수 있는 Gemini 모델을 찾지 못했습니다. 키 권한을 확인하세요.";
+      }).catch(function (e) {
+        msg.textContent = "모델 목록을 받지 못했습니다: " + ((e && e.message) || "연결 실패") + (location.protocol === "file:" || location.protocol === "https:" ? "" : " (claude.ai 미리보기에서는 외부 연결이 막혀 있습니다)");
+      }).then(function () { btn.disabled = false; });
+    });
+
+    // 저장 버튼: 화면의 모든 입력값을 한 번에 확정하고 동기화
+    $("settings").addEventListener("input", function (e) { if (e.target.id !== "saveBtn") markDirty(); });
+    $("saveBtn").addEventListener("click", function () {
+      document.querySelectorAll("#settings input, #settings select, #settings textarea").forEach(function (el) {
+        if (el.type === "file" || el.type === "button" || el.type === "radio" || el.closest("#netUrls")) return;
+        el.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+      saveSettings();
+      if (store.syncNow) store.syncNow();
+      toast("설정을 저장했습니다" + (store.backend() === "gist" ? " · GitHub에도 동기화합니다" : ""));
+    });
+
     $("conn").innerHTML = D.connections.map(function (g) {
       return "<div><b>" + esc(g.group) + "</b>" + g.items.map(function (i) {
         return '<a href="' + esc(i[1]) + '" target="_blank" rel="noopener noreferrer">' + esc(i[0]) + " →</a>";
       }).join("") + "</div>";
     }).join("");
     $("netUrls").innerHTML = D.networks.map(function (n) {
-      return '<label class="f">' + esc(n.name) + '<input type="url" id="nu_' + n.id + '" data-net="' + n.id + '" placeholder="https://" value="' + esc(S.netUrls[n.id] || "") + '"></label>';
+      var v = S.netUrls[n.id] || "";
+      return '<div class="f nurl"><label for="nu_' + n.id + '">' + esc(n.name) + '</label><div class="nurlrow"><input type="url" id="nu_' + n.id + '" data-net="' + n.id + '" placeholder="https:// 대시보드 주소" value="' + esc(v) + '">' +
+        '<a class="btn ghost sm" id="nuo_' + n.id + '" href="' + esc(v || "#") + '" target="_blank" rel="noopener noreferrer"' + (v ? "" : " hidden") + '>열기</a></div><small class="nuchk" id="nuc_' + n.id + '"></small></div>';
     }).join("");
-    $("netUrls").addEventListener("change", function (e) {
+    D.networks.forEach(function (n) { if (S.netUrls[n.id]) checkNetUrl(n.id, true); });
+    var nuTimer = {};
+    $("netUrls").addEventListener("input", function (e) {
       var id = e.target.dataset.net; if (!id) return;
-      var v = e.target.value.trim();
-      if (v && !/^https?:\/\//i.test(v)) { toast("주소는 https:// 로 시작해야 합니다"); return; }
-      S.netUrls = Object.assign({}, S.netUrls); S.netUrls[id] = v; saveSettings(); renderAiState();
+      clearTimeout(nuTimer[id]); setNuState(id, "wait", "확인 중…");
+      nuTimer[id] = setTimeout(function () { checkNetUrl(id); }, 600);
     });
+    $("netUrls").addEventListener("change", function (e) { var id = e.target.dataset.net; if (id) { clearTimeout(nuTimer[id]); checkNetUrl(id); } });
 
     $("exportBtn").addEventListener("click", function () {
       store.set("lastBackup", Date.now());
@@ -794,7 +881,7 @@
   var booted = false;
   function boot() {
     if (booted) return; booted = true;
-    S = Object.assign({}, DEFAULTS, store.get("settings", {}));
+    S = upgradeModels(Object.assign({}, DEFAULTS, store.get("settings", {})));
     board = store.get("board", []); log = store.get("log", []);
     applyTheme();
     (window.Lab.extraInits || []).forEach(function (fn) { inits.push(fn); });
