@@ -201,7 +201,7 @@
   function cleanAngle(x) { return String(x).replace(/\(.*?\)/g, "").trim(); }
   function candidates(id, ctx) {
     var p = BY[id], f = filler(id, ctx), cat = L.catById(ctx.cat), c = cat || { angles: ["무료 확인"], keywords: ["무료 상담"] };
-    var T = [], Sb = [];
+    var T = L.wins ? L.wins.titles(ctx.cat).map(function (t) { return t.slice(0, 40); }) : [], Sb = [];
     p.copy.forEach(function (x) { var v = f(x[1]); if (TITLE_RX.test(x[0])) T.push(v); else if (SUB_RX.test(x[0])) Sb.push(v); });
     var a0 = cleanAngle(c.angles[0]), a1 = cleanAngle(c.angles[1] || c.angles[0]);
     var search = id === "naver_sa" || id === "google_sa";

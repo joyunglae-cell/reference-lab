@@ -472,6 +472,7 @@
         var dg = diagnose(o, m, n, prev);
         var html = renderMetrics(o, m, dg, n) + creativeRows(o, f.rows);
         o = patch(o.id, function (c) { c.stages = c.stages || {}; c.stages["s" + n] = { inputs: f, html: html, verdict: dg.verdict[1], done: true, at: Date.now() }; });
+        if (L.wins) L.wins.record(o, f.rows, n);
         var out = $("s" + n + "Out"); out.innerHTML = html; if ($("opsEx")) $("opsEx").open = false;
         runAI(o, "s" + n, out, prompt23(o, n, m, dg, f.rows, f.memo, prev), images("s" + n + "imgs"), $("s" + n + "run"), $("s" + n + "stop"), n === 2 ? "1차 점검" : "재확인");
         renderList(); L.emit("ops");

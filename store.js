@@ -6,7 +6,7 @@
 window.LabStore = (function () {
   "use strict";
   var PREFIX = "reflab.";
-  var SYNC_KEYS = ["entries", "board", "log", "checks", "calc", "history", "reports", "chat", "cases", "settings", "bizchecks", "media", "ops", "merchants", "prices", "priceAlerts", "work", "picks", "pickSel", "studio", "bridge"];
+  var SYNC_KEYS = ["entries", "board", "log", "checks", "calc", "history", "reports", "chat", "cases", "settings", "bizchecks", "media", "ops", "merchants", "prices", "priceAlerts", "work", "picks", "pickSel", "studio", "bridge", "wins", "plan"];
   var SECRET = ["claudeKey", "geminiKey", "ghToken", "tgToken", "ytKey"];
   var GIST_FILE = "reflab-data.json";
 

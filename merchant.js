@@ -56,13 +56,36 @@
     });
     var best = Object.keys(byCh).filter(function (k) { return byCh[k].rev > 0; }).sort(function (a, b) { return (byCh[b].rev - byCh[b].cost) - (byCh[a].rev - byCh[a].cost); })[0];
     var own = spend > 0 && leads >= 10;
-    return { refCPL: own ? spend * vat / leads : (+S.refCPL || 10000), own: own, best: best || (S.mainCh || "meta") };
+    return { refCPL: own ? spend * vat / leads : (+S.refCPL || 10000), own: own, best: best || (S.mainCh || "meta"), camps: myByCamp() };
+  }
+  /* 내 정산 기록(최근 90일)에서 캠페인별 실제 승인율·손익 */
+  function nk(x) { return L.importer ? L.importer.normName(x) : String(x || "").toLowerCase().trim(); }
+  function myByCamp() {
+    var S = L.settings(), vat = S.vat ? 1.1 : 1, wht = S.wht ? 0.033 : 0, from = L.dash.addDays(L.dash.today(), -89), out = {};
+    L.store.get("entries", []).forEach(function (e) {
+      if (!e.camp || L.dash.parse(e.date) < from) return;
+      var k = nk(e.camp), o = out[k] = out[k] || { name: e.camp, leads: 0, appr: 0, rev: 0, cost: 0 };
+      o.leads += +e.leads || 0; o.appr += +e.appr || 0; o.rev += (+e.rev || 0) * (1 - wht); o.cost += (+e.spend || 0) * vat;
+    });
+    return out;
+  }
+  function mine4(m, st) {
+    var map = st.camps || {}, k = nk(m.name), hit = map[k];
+    if (!hit && k.length >= 3) Object.keys(map).some(function (c) { if (c.length >= 3 && (c.indexOf(k) >= 0 || k.indexOf(c) >= 0)) { hit = map[c]; return true; } return false; });
+    return hit || null;
   }
   function score(m, st) {
     st = st || myStats();
-    var S = L.settings(), P = +m.payout || 0, ap = +m.approve || 0, a = (ap || 70) / 100;
+    var S = L.settings(), P = +m.payout || 0, ap = +m.approve || 0;
+    var me = mine4(m, st), why0 = [];
+    if (me && me.leads >= 10 && me.appr > 0) {
+      var real = Math.round(me.appr / me.leads * 100);
+      why0.push("내 실제 승인율 " + real + "% (DB " + me.leads + "건)" + (ap && Math.abs(real - ap) >= 10 ? " · 공지 " + ap + "%" : ""));
+      ap = real;
+    }
+    var a = (ap || 70) / 100;
     var hi = L.maxCPL(P, a, S.marginMin / 100, S.wht);
-    var rules = mediaRules(m.media), why = [], sc = 0;
+    var rules = mediaRules(m.media), why = why0, sc = 0;
     // 1) 수익 여유 (최대 40점): 한계 DB당 광고비가 내 기준 DB당 광고비의 몇 배인가
     var room = st.refCPL > 0 ? hi / st.refCPL : 0;
     sc += Math.max(0, Math.min(room / 2, 1)) * 40;
@@ -89,6 +112,14 @@
     }
     // 5) 단가 규모 (최대 16점): 소재 테스트 비용을 감당할 수 있는 단가
     sc += Math.min(P / 40000, 1) * 16;
+    // 6) 내 실적 (가감): 실제로 돌려 본 머천트는 손익으로 판단
+    if (me && me.cost > 0) {
+      var pm = me.rev > 0 ? (me.rev - me.cost) / me.rev : -1;
+      if (pm >= S.marginMin / 100) { sc += 8; why.push("내 실적 흑자 · 순수익률 " + Math.round(pm * 100) + "%"); }
+      else if (pm < 0) { sc -= 12; why.push("내 실적 적자 " + won(me.rev - me.cost)); }
+      else why.push("내 실적 순수익률 " + Math.round(pm * 100) + "% (목표 미만)");
+    }
+    if (hi > 0) why.push("첫 테스트 최대 손실 약 " + won(Math.round(hi * 2 * 3 / 1000) * 1000) + " (소재 3개 × 끄기 기준)");
     return { sc: Math.max(0, Math.min(100, Math.round(sc))), hi: hi, rules: rules, cat: cat, why: why };
   }
   function chips(rules) {
