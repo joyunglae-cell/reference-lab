@@ -667,6 +667,14 @@
       S.ghToken = ""; S.gistId = ""; saveSettings(); store.disconnectGist(); renderSettings(); toast("GitHub 연결을 해제했습니다. 기록은 이 브라우저에 남아 있습니다.");
     });
     store.onStatus(function () { renderSync(); renderAiState(); });
+    // 다른 기기에서 바뀐 기록을 받아오면 화면을 새로 그립니다 (입력 중이면 알림만)
+    store.onStatus(function (ev) {
+      if (ev !== "remote") return;
+      var el = document.activeElement, typing = el && /INPUT|TEXTAREA|SELECT/.test(el.tagName) && el.type !== "button";
+      if (typing) { toast("다른 기기의 새 기록을 받았습니다 · 입력을 마친 뒤 새로고침하면 반영됩니다"); return; }
+      toast("다른 기기의 새 기록을 불러와 화면을 새로 고칩니다");
+      setTimeout(function () { location.reload(); }, 1200);
+    });
     $("sVat").addEventListener("change", function () { S.vat = $("sVat").checked; S.taxMode = "custom"; saveSettings(); renderSettings(); });
     $("sWht").addEventListener("change", function () { S.wht = $("sWht").checked; S.taxMode = "custom"; saveSettings(); renderSettings(); });
     $("sTax").addEventListener("change", function () {

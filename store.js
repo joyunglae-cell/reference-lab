@@ -6,8 +6,8 @@
 window.LabStore = (function () {
   "use strict";
   var PREFIX = "reflab.";
-  var SYNC_KEYS = ["entries", "board", "log", "checks", "calc", "history", "reports", "chat", "cases", "settings", "bizchecks", "media", "ops", "merchants", "prices", "priceAlerts"];
-  var SECRET = ["claudeKey", "geminiKey", "ghToken", "tgToken"];
+  var SYNC_KEYS = ["entries", "board", "log", "checks", "calc", "history", "reports", "chat", "cases", "settings", "bizchecks", "media", "ops", "merchants", "prices", "priceAlerts", "work", "picks", "pickSel", "studio", "bridge"];
+  var SECRET = ["claudeKey", "geminiKey", "ghToken", "tgToken", "ytKey"];
   var GIST_FILE = "reflab-data.json";
 
   var cache = {}, meta = {}, saved = {};
@@ -143,16 +143,44 @@ window.LabStore = (function () {
     }).then(function () { setStatus({ state: "ok", last: Date.now(), error: "" }); })
       .catch(function (e) { setStatus({ state: "error", error: (e && (e.message || e.code)) || "저장 실패" }); });
   }
+  /* 올리기 전에 Gist를 먼저 읽어, 다른 기기가 더 최근에 바꾼 항목은 받아 온 뒤 합쳐서 올립니다.
+     (그대로 덮어쓰면 열어 둔 채였던 기기가 다른 기기의 새 기록을 지울 수 있음) */
+  var gistChain = Promise.resolve();
   function pushGist() {
-    var s = get("settings", {}) || {};
-    if (!s.gistId || !s.ghToken) return Promise.resolve();
-    setStatus({ state: "saving" });
-    var body = { files: {} };
-    body.files[GIST_FILE] = { content: JSON.stringify(snapshot()) };
-    return gh("/gists/" + s.gistId, { method: "PATCH", body: body })
-      .then(function () { setStatus({ state: "ok", last: Date.now(), error: "" }); })
-      .catch(function (e) { setStatus({ state: "error", error: e.message }); });
+    gistChain = gistChain.then(pushGistNow, pushGistNow);
+    return gistChain;
   }
+  async function pushGistNow() {
+    var s = get("settings", {}) || {};
+    if (!s.gistId || !s.ghToken) return;
+    setStatus({ state: "saving" });
+    try {
+      var remote = await gistLoad(s.gistId);
+      var changed = merge(remote, function () {});
+      var body = { files: {} };
+      body.files[GIST_FILE] = { content: JSON.stringify(snapshot()) };
+      await gh("/gists/" + s.gistId, { method: "PATCH", body: body });
+      setStatus({ state: "ok", last: Date.now(), error: "" });
+      if (changed) emit("remote");
+    } catch (e) { setStatus({ state: "error", error: e.message }); }
+  }
+  /* 다른 기기 기록 받아오기 (앱으로 다시 돌아올 때) */
+  var pulling = null;
+  function pullGist() {
+    var s = get("settings", {}) || {};
+    if (backend !== "gist" || !s.gistId || !s.ghToken || pulling) return Promise.resolve(false);
+    pulling = gistLoad(s.gistId).then(function (remote) {
+      var needPush = false;
+      var changed = merge(remote, function () { needPush = true; });
+      setStatus({ state: "ok", last: Date.now(), error: "" });
+      if (needPush) pushGist();
+      if (changed) emit("remote");
+      return changed;
+    }).catch(function (e) { setStatus({ state: "error", error: e.message }); return false; })
+      .then(function (c) { pulling = null; return c; });
+    return pulling;
+  }
+  function emit(ev) { listeners.forEach(function (fn) { try { fn(ev); } catch (e) {} }); }
   function merge(remote, pushLocalNewer) {
     var changed = false;
     SYNC_KEYS.forEach(function (k) {
@@ -206,6 +234,12 @@ window.LabStore = (function () {
     }
   }
 
+  var lastPull = 0;
+  try {
+    document.addEventListener("visibilitychange", function () {
+      if (document.visibilityState === "visible" && Date.now() - lastPull > 15000) { lastPull = Date.now(); pullGist(); }
+    });
+  } catch (e) {}
   var ready = (async function () {
     try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
     try {
@@ -221,6 +255,7 @@ window.LabStore = (function () {
     backend: function () { return backend; },
     connectGist: async function () { var c = await connectGist(); return c; },
     disconnectGist: function () { if (backend === "gist") backend = null; setStatus({ mode: "local", state: "idle", error: "" }); },
+    pull: pullGist,
     syncNow: function () {
       if (backend === "gist") return pushGist();
       if (backend === "claude") { SYNC_KEYS.forEach(function (k) { if (get(k) !== undefined) pushClaude(k); }); return Promise.resolve(); }
