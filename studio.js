@@ -209,7 +209,9 @@
     else if (id === "kakao") T.push(f("{keyword} 1분 무료 확인"), f(a0 + ", 지금 바로 조회"));
     else if (search) T.push(f("{keyword} 무료 비교"), f(a0 + " 무료 상담"));
     else T.push(f("{target}{이라면} 꼭 확인하세요"), f("{keyword}, 이것 모르고 가입하면 손해"), f(a0 + ", 1분이면 확인됩니다"), f(a1 + " 무료로 받아보세요"));
-    Sb.push(f("{benefit}"), "1분 신청 · 상담은 무료, 결정은 천천히", f("{target} 맞춤으로 {number} 비교"));
+    Sb.push(f("{benefit}"), f("{target}{이라면} 해당돼요 · 1분이면 확인"), "1분 신청 · 상담은 무료, 결정은 천천히", f("{target} 맞춤으로 {number} 비교"));
+    var nowL = L.lpfit && cat ? (L.lpfit.NOW[cat.id] || [])[0] : "";
+    if (nowL) Sb.push(nowL);
     var uniq = function (arr) { var seen = {}; return arr.filter(function (x) { x = x.trim(); if (!x || seen[x]) return false; seen[x] = 1; return true; }); };
     return { t: uniq(T.concat(mk[id] && mk[id].aiT || [])), s: uniq(Sb.concat(mk[id] && mk[id].aiS || [])) };
   }
@@ -232,6 +234,7 @@
       '<div class="inputs"><label class="f full">제목 직접 수정<input type="text" id="mkTitle" value="' + esc(m.t) + '"></label><label class="f full">소제목 직접 수정<input type="text" id="mkSub" value="' + esc(m.s) + '"></label></div>' +
       '<div class="row"><button class="btn ghost sm" type="button" id="mkCopyBtn">제목 · 소제목 복사</button></div>' +
       (L.catById(ctx.cat) ? '<div class="avoid"><b>피할 표현</b> ' + esc(L.catById(ctx.cat).avoid) + "</div>" : "");
+    if (L.lpfit) L.lpfit.render();
   }
 
   /* 이미지: 비율 · 지시문 · 캔버스 합성 */
@@ -396,6 +399,7 @@
       "업종: " + (cat ? cat.name + " / 타깃 " + cat.target + " / 고민 " + cat.pain + " / 혜택 " + cat.benefit : "미정"),
       w && w.page ? "랜딩 페이지 내용: " + String(w.page).slice(0, 500) : "",
       cat ? "피할 표현: " + cat.avoid : "", "단정·과장 금지, 후기형이면 [광고] 표기.",
+      "랜딩 5원칙: ① 제목의 핵심 단어를 랜딩 첫 화면과 같게 ② 소제목은 '나도 해당되는지'(대상·연령) 또는 '왜 지금'(실제 기한·혜택만) ③ 숫자 1개 ④ 대충 봐도 꽂히게 짧게",
       '출력은 JSON 한 줄만: {"titles":["..."],"subs":["..."]}'
     ].filter(Boolean).join("\n");
     window.LabAI.run({ provider: S.provider, settings: Object.assign({}, S, { web: false }), prompt: prompt, onText: function () {} }).then(function (t) {
@@ -454,6 +458,7 @@
       "[역할] 너는 " + L.chById(id).name + " 사용자의 시선을 0.5초 만에 잡는 한국 퍼포먼스 마케터다.",
       "[입력] 업종: " + (cat ? cat.name + " / 타깃 " + cat.target + " / 고민 " + cat.pain + " / 혜택 " + cat.benefit : "미정") + (w && w.page ? "\n랜딩 페이지 내용: " + String(w.page).slice(0, 600) : ""),
       "[매체 톤] " + BY[id].tone.replace(/\*\*/g, ""),
+      "[랜딩 5원칙] 문구는 랜딩 첫 화면 메시지와 같은 약속이어야 함 · 대상이 바로 보이게 · 왜 이것+왜 지금(실제 조건만) · 짧고 숫자 1개",
       "[제약] 1. 공백 포함 " + max + "자 이내 2. 과장·허위 표현 금지('최고','1위','무조건','공짜','100%') " + (cat ? "3. 피할 표현: " + cat.avoid : ""),
       "[앵글] " + angles.join(" / ") + " — 각 앵글마다 5개씩 총 20개",
       "[이미지] 글자 없는 광고 사진용 영어 지시문 10개 (실제 스마트폰 사진처럼, 장면·구도·빛을 서로 다르게)",
@@ -482,17 +487,22 @@
     if (pts.length < 2 && cat) pts = [cat.benefit.replace(/있다$/, "있습니다").replace(/는다$/, "습니다"), "신청은 1분이면 끝나고 상담은 무료입니다", "상담 후 결정해도 괜찮습니다"];
     var h = function (x) { return esc(x); };
     var title = m.t || (cat ? cat.keywords[0] + " 무료 확인" : "무료 상담 안내"), sub = m.s || (cat ? cat.benefit : "");
+    // 랜딩 5원칙: 같은 메시지 → 대상 → 왜 이것 → 왜 지금 → 버튼 → 안심
+    var K = L.lpfit ? L.lpfit.kit(ctx, title, sub) : { targets: [], whyNow: [], safe: [] };
     return [
       "<!doctype html>", '<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">',
       "<title>" + h(title) + "</title>", '<meta name="robots" content="noindex">',
       gtm ? "<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','" + gtm + "');</script>" : "",
       pixel ? "<script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','" + pixel + "');fbq('track','PageView');</script>" : "",
       $("brExtra").value.trim(),
-      "<style>body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;background:#f4f5f7;color:#1b1d22}main{max-width:480px;margin:0 auto;padding:28px 20px 40px}.ad{display:inline-block;font-size:12px;font-weight:700;color:#7a808a;border:1px solid #d5d9e0;border-radius:6px;padding:2px 8px}h1{font-size:26px;line-height:1.35;margin:14px 0 8px;letter-spacing:-.02em}.sub{color:#555b66;font-size:16px;margin:0 0 18px}ul{list-style:none;padding:0;margin:0 0 22px;display:grid;gap:10px}li{background:#fff;border-radius:14px;padding:14px 16px;font-size:15px;font-weight:600}li:before{content:'✔ ';color:#1FB865}.go{display:block;text-align:center;background:#1FB865;color:#fff;font-size:18px;font-weight:800;text-decoration:none;padding:17px;border-radius:14px}.note{font-size:12px;color:#7a808a;line-height:1.6;margin-top:22px}</style>",
+      "<style>body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;background:#f4f5f7;color:#1b1d22}main{max-width:480px;margin:0 auto;padding:28px 20px 40px}.ad{display:inline-block;font-size:12px;font-weight:700;color:#7a808a;border:1px solid #d5d9e0;border-radius:6px;padding:2px 8px}h1{font-size:26px;line-height:1.35;margin:14px 0 8px;letter-spacing:-.02em}.sub{color:#555b66;font-size:16px;margin:0 0 18px}ul{list-style:none;padding:0;margin:0 0 22px;display:grid;gap:10px}li{background:#fff;border-radius:14px;padding:14px 16px;font-size:15px;font-weight:600}li:before{content:'✔ ';color:#1FB865}.go{display:block;text-align:center;background:#1FB865;color:#fff;font-size:18px;font-weight:800;text-decoration:none;padding:17px;border-radius:14px}.note{font-size:12px;color:#7a808a;line-height:1.6;margin-top:22px}h2{font-size:15px;margin:0 0 10px;color:#3a3f48}.who{background:#fff;border:2px solid #1FB865;border-radius:14px;padding:14px 16px;margin:0 0 18px}.who li{background:none;padding:2px 0;font-weight:700}.now{background:#fff7e6;color:#8a5300;border-radius:12px;padding:12px 14px;font-size:14px;font-weight:700;margin:0 0 12px}.safe{margin:16px 0 0;gap:6px}.safe li{background:none;padding:0;font-size:13px;font-weight:500;color:#555b66}.safe li:before{content:'🔒 ';color:inherit}</style>",
       "</head><body>", gtm ? '<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=' + gtm + '" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>' : "",
       "<main>", '<span class="ad">광고 · 제휴 안내</span>', "<h1>" + h(title) + "</h1>", sub ? '<p class="sub">' + h(sub) + "</p>" : "",
-      "<ul>" + pts.map(function (x) { return "<li>" + h(x) + "</li>"; }).join("") + "</ul>",
-      '<a class="go" id="go" href="' + h(safeUrl) + '" rel="nofollow">' + h(cat ? "무료로 확인하기" : "신청하러 가기") + " →</a>",
+      K.targets.length ? '<div class="who"><h2>이 중 하나라도 해당되면 신청할 수 있어요</h2><ul>' + K.targets.slice(0, 3).map(function (x) { return "<li>" + h(x) + "</li>"; }).join("") + "</ul></div>" : "",
+      "<h2>이런 걸 받을 수 있어요</h2><ul>" + pts.map(function (x) { return "<li>" + h(x) + "</li>"; }).join("") + "</ul>",
+      K.whyNow.length && $("brNow").checked ? '<p class="now">⏰ ' + h(K.whyNow[0]) + "</p>" : "",
+      '<a class="go" id="go" href="' + h(safeUrl) + '" rel="nofollow">' + h(cat ? "1분 무료로 확인하기" : "신청하러 가기") + " →</a>",
+      K.safe.length && $("brSafe").checked ? '<ul class="safe">' + K.safe.slice(0, 3).map(function (x) { return "<li>" + h(x[1].replace(/\s*\((개인정보 처리방침 링크|광고주 확인 후 사용)\)/g, "")) + "</li>"; }).join("") + "</ul>" : "",
       '<p class="note">이 페이지는 제휴 마케팅 광고 안내 페이지입니다. 신청은 광고주(서비스 제공사) 페이지에서 진행되며, 운영자는 광고주로부터 수수료를 받을 수 있습니다. 운영자는 광고주의 공식 대리점이 아닙니다.' + ($("brOwner").value.trim() ? "<br>" + h($("brOwner").value.trim()) : "") + "</p>",
       "</main>",
       "<script>document.getElementById('go').addEventListener('click',function(e){var u=this.href;if(!/^https?:/.test(u))return;e.preventDefault();try{if(window.fbq)fbq('track','Lead');}catch(_){}try{(window.dataLayer=window.dataLayer||[]).push({event:'apply_click'});}catch(_){}setTimeout(function(){location.href=u;},350);});</script>",
@@ -618,10 +628,12 @@
     });
     var bst = L.store.get("bridge", {});
     $("brPixel").value = bst.pixel || ""; $("brGtm").value = bst.gtm || ""; $("brOwner").value = bst.owner || ""; $("brExtra").value = bst.extra || "";
-    ["brUrl", "brPixel", "brGtm", "brOwner", "brExtra"].forEach(function (k) {
-      $(k).addEventListener("input", function () {
+    if (bst.now === false) $("brNow").checked = false;
+    if (bst.safe === false) $("brSafe").checked = false;
+    ["brUrl", "brPixel", "brGtm", "brOwner", "brExtra", "brNow", "brSafe"].forEach(function (k) {
+      $(k).addEventListener($(k).type === "checkbox" ? "change" : "input", function () {
         if (k === "brUrl") $("brUrl").dataset.touched = "1";
-        L.store.set("bridge", { pixel: $("brPixel").value.trim(), gtm: $("brGtm").value.trim(), owner: $("brOwner").value.trim(), extra: $("brExtra").value });
+        L.store.set("bridge", { pixel: $("brPixel").value.trim(), gtm: $("brGtm").value.trim(), owner: $("brOwner").value.trim(), extra: $("brExtra").value, now: $("brNow").checked, safe: $("brSafe").checked });
         renderBridge();
       });
     });

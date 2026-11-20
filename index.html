@@ -227,6 +227,7 @@
     <div class="grid2 mkgrid">
       <div class="panel stack" id="mkCopy"></div>
       <div class="panel stack" id="stWins" hidden></div>
+      <div class="panel stack" id="stLp"></div>
       <div class="panel stack" id="mkImg">
         <div class="row between"><h3 class="sub">광고 이미지 <small class="muted" id="mkRatioNote"></small></h3><div class="seg" id="mkRatio" role="group" aria-label="이미지 비율"></div></div>
         <div class="mkcanvas"><canvas id="mkCanvas" width="1080" height="1080" aria-label="광고 이미지 시안"></canvas></div>
@@ -255,6 +256,8 @@
         <label class="f">구글 태그 매니저 ID (선택)<input type="text" id="brGtm" placeholder="GTM-XXXXXXX"></label>
         <label class="f full">당근 등 추가 전환 스크립트 (선택 · 매체 광고센터에서 받은 코드를 그대로 붙여넣기)<textarea id="brExtra" rows="2" placeholder="&lt;script&gt;...&lt;/script&gt;"></textarea></label>
         <label class="f full">운영자 표기 (페이지 하단 · 정책상 권장)<input type="text" id="brOwner" placeholder="예: 운영자 홍길동 · 사업자등록번호 000-00-00000 · 문의 이메일"></label>
+        <label class="toggle full"><input type="checkbox" id="brNow" checked> '왜 지금' 한 줄 넣기 (광고주 조건에 실제로 있는 기한·혜택일 때만)</label>
+        <label class="toggle full"><input type="checkbox" id="brSafe" checked> 안심 문구 3줄 넣기 (연락 횟수·강요 없음·개인정보 · 광고주 정책과 같은지 확인)</label>
       </div>
       <p class="note">신청 버튼을 누르면 Meta <b>Lead</b> 이벤트와 GTM <b>apply_click</b> 이벤트를 보낸 뒤 제휴 링크로 이동합니다. 이 이벤트는 '신청 버튼 클릭' 기준이라 실제 DB 수보다 많게 잡히니, 정산 DB와 대조해 판단하세요. 만든 HTML은 Netlify·GitHub Pages·카페24 등 내 도메인에 올리면 됩니다.</p>
       <div class="brwrap"><iframe id="brPreview" sandbox="" title="브릿지 페이지 미리보기"></iframe><textarea id="brOut" rows="10" readonly aria-label="브릿지 페이지 HTML"></textarea></div>
@@ -662,6 +665,22 @@
     </div>
     <div class="stack gpane" id="gp-hooks" data-gp="hooks" hidden>
       <p class="note gnote">업종을 고르면 8가지 훅 공식에 맞춘 첫 문장과 15초 숏폼 대본 뼈대가 나옵니다.</p>
+      <div class="panel stack guide" id="lp5Guide">
+        <h3 class="sub"><span class="gno">★</span>랜딩 전환 5원칙 <small class="muted">클릭은 받았는데 DB가 안 나올 때 가장 먼저 볼 것</small></h3>
+        <p class="note">클릭했다는 것은 광고가 만든 <b>흥미·호기심이 클릭에 드는 시간과 에너지보다 컸다</b>는 뜻입니다. 랜딩에서 그 기대가 바로 이어지지 않으면, 고객은 허탈함과 광고에 대한 반감을 느끼고 바로 떠납니다. 4단계 광고 제작의 <b>'랜딩 전환 5원칙 점검'</b>이 내 제목과 랜딩 내용으로 자동 점검합니다.</p>
+        <div class="tablewrap"><table class="data gtbl"><thead><tr><th>원칙</th><th>고객 속마음</th><th>나쁜 예</th><th>좋은 예</th></tr></thead><tbody>
+          <tr><td><b>① 소재-랜딩 일치</b><br><small>가장 흔한 실수</small></td><td>"내가 본 그 내용 어디 있지?"</td><td>광고: "40대 실비보험료 1분 비교" → 랜딩 첫 화면: "OO손해보험 브랜드 소개"</td><td>랜딩 맨 위 큰 글씨가 광고 제목과 <b>같은 말</b>: "40대 실비보험료, 1분이면 비교됩니다"</td></tr>
+          <tr><td><b>② 타깃 명확</b><br><small>관여도 높이기</small></td><td>"좋긴 한데 나도 해당돼?"</td><td>조건·대상이 맨 아래 작은 글씨에만 있음</td><td>제목 바로 아래 "이런 분이라면 해당돼요 ✔ 30~50대 ✔ 실비 가입 5년 이상 ✔ 보험료 월 10만 원 이상"</td></tr>
+          <tr><td><b>③ 혜택: 왜 이것 + 왜 지금</b><br><small>대부분 '지금'을 놓침</small></td><td>"좋은데… 나중에 하지 뭐"</td><td>상품 장점만 나열하고 끝</td><td>장점(숫자 1개) + 버튼 위 "갱신 전에 점검해야 다음 달 보험료부터 바뀝니다" · <u>실제 조건에 있는 기한·혜택만</u></td></tr>
+          <tr><td><b>④ 심리장벽 해소</b><br><small>폼에 가까울수록 불안 증가</small></td><td>"사기 아냐? 전화 폭탄 오는 거 아냐? 뭘 숨긴 거 아냐?"</td><td>폼만 덩그러니, 운영사 정보 없음</td><td>폼 위·아래에 "연락은 1회, 원치 않으면 중단" · "가입 의무 없음" · "요청 시 정보 삭제" · 운영사·고객센터 공개</td></tr>
+          <tr><td><b>⑤ 인지 부하 줄이기</b><br><small>고객은 대충 훑어봄</small></td><td>"뭔 소리야, 나갈래"</td><td>긴 문단, 작은 글씨, 입력 항목 7개</td><td>한 줄 30자 이내 · 숫자 강조 · 체크 3줄 · 입력 4개 이하 · 버튼 1종류</td></tr>
+        </tbody></table></div>
+        <div class="days gdays">
+          <div><b>3초 구조 (위에서 아래로)</b><span>① 광고와 같은 큰 제목 → ② "이런 분이라면 해당돼요" 체크 3줄 → ③ 혜택 숫자 1개 → ④ ⏰ 지금 신청할 이유 1줄 → ⑤ 버튼 → ⑥ 🔒 안심 3줄</span></div>
+          <div><b>네트워크 랜딩을 못 고칠 때</b><span>광고 → <b>내 브릿지 페이지</b> → 네트워크 랜딩. 4단계 '브릿지 페이지 만들기'가 이 3초 구조로 자동 생성합니다. 브릿지 허용 여부는 캠페인 조건에서 먼저 확인하세요.</span></div>
+          <div><b>숫자로 확인</b><span>CTR은 정상인데 랜딩 신청률이 3% 미만이면 소재가 아니라 <b>랜딩(①~⑤)</b> 문제입니다. 6단계 점검의 진단과 함께 보세요.</span></div>
+        </div>
+      </div>
     <div class="row between"><div class="seg wrap" id="hookCats"></div><button class="btn ghost sm" type="button" id="hookAll">↻ 8종 모두 새로</button></div>
     <div class="grid2">
       <div class="panel stack">
@@ -1014,5 +1033,6 @@
 <script src="flow.js"></script>
 <script src="refs.js"></script>
 <script src="plan.js"></script>
+<script src="lpfit.js"></script>
 </body>
 </html>

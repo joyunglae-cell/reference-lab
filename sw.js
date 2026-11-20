@@ -1,8 +1,8 @@
 /* 앱 설치용 서비스 워커: 사이트 파일을 저장해 두고 오프라인에서도 열리게 합니다.
    AI·GitHub 등 외부 요청은 건드리지 않습니다. 파일을 바꾸면 VERSION을 올리세요. */
-var VERSION = "reflab-v15";
+var VERSION = "reflab-v16";
 var FILES = [
-  "./", "./index.html", "./style.css", "./data.js", "./store.js", "./numfmt.js", "./ai.js", "./app.js", "./dash.js", "./analyze.js", "./assist.js", "./ops.js", "./import.js", "./merchant.js", "./studio.js", "./flow.js", "./refs.js", "./plan.js",
+  "./", "./index.html", "./style.css", "./data.js", "./store.js", "./numfmt.js", "./ai.js", "./app.js", "./dash.js", "./analyze.js", "./assist.js", "./ops.js", "./import.js", "./merchant.js", "./studio.js", "./flow.js", "./refs.js", "./plan.js", "./lpfit.js",
   "./icon.svg", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png"
 ];
 
